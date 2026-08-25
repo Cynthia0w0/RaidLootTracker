@@ -1,0 +1,12 @@
+## Interface: 120100,120007,120001,120000
+## Title: 团队装备需求记录
+## Title-zhCN: 团队装备需求记录
+## Notes: 记录团队每周装备需求与团本掉落分配
+## Notes-zhCN: 记录团队每周装备需求与团本掉落分配
+## Author: 萌系毕业生
+## Version: 1.0.0
+## Category: Raid
+## IconTexture: Interface\Icons\INV_Misc_Coin_01
+## SavedVariables: RaidLootTrackerDB
+
+RaidLootTracker.lua
