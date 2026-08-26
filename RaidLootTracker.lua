@@ -46,6 +46,21 @@ end
 ----------------------------------------------------------------
 -- 默认数据
 ----------------------------------------------------------------
+-- 计算「本周四 07:00 (UTC+8)」对应的稳定周标识；每到周四 07:00 该值会跳变一次
+local function GetWeeklyResetKey()
+    local utc = GetServerTime()
+    local t = utc + 8 * 3600                    -- 转为 UTC+8 墙钟时间
+    local dayIndex = math.floor(t / 86400)
+    local secondsIntoDay = t % 86400
+    -- 在 UTC+8 坐标系下，1970-01-01 00:00 是周三，故 dayIndex % 7 == 1 时是周四
+    local daysSinceThursday = (dayIndex - 1) % 7
+    local secondsSinceReset = daysSinceThursday * 86400 + secondsIntoDay - 7 * 3600
+    if secondsSinceReset < 0 then
+        secondsSinceReset = secondsSinceReset + 7 * 86400
+    end
+    return utc - secondsSinceReset
+end
+
 local defaults = {
     members = {},      -- { {name=..., class=...}, ... }
     bosses = {},       -- { {name=..., timestamp=..., items={...} }, ... }
@@ -205,20 +220,20 @@ function Data:ClearPendingLoot()
 end
 
 function Data:CheckWeeklyReset()
-    local now = GetServerTime()
+    local key = GetWeeklyResetKey()
     if not DB.weekStart then
-        DB.weekStart = now
+        DB.weekStart = key
         return
     end
-    if (now - DB.weekStart) > 7 * 24 * 3600 then
-        DB.weekStart = now
+    if DB.weekStart ~= key then
+        DB.weekStart = key
         DB.bosses = {}
-        print("|cff00ff00团队装备需求记录|r：检测到新的一周，已清空上周记录。")
+        print("|cff00ff00团队装备需求记录|r：检测到新的一周（周四 07:00），已清空上周记录。")
     end
 end
 
 function Data:ResetWeek()
-    DB.weekStart = GetServerTime()
+    DB.weekStart = GetWeeklyResetKey()
     DB.bosses = {}
     DB.pendingLoot = {}
     DB.currentBoss = ""
