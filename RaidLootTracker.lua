@@ -1167,16 +1167,15 @@ function UI:ExportReport()
         end
     end
 
-    local full = table.concat(lines, "\n")
-    if DEFAULT_CHAT_FRAME and DEFAULT_CHAT_FRAME.editBox then
-        local eb = DEFAULT_CHAT_FRAME.editBox
-        eb:SetText(full)
-        eb:SetFocus()
-        if eb.HighlightText then
-            eb:HighlightText()
-        end
+    -- 逐行打印到聊天窗口，直接可见
+    for _, line in ipairs(lines) do
+        print(line)
     end
-    print("|cff00ff00团队装备需求记录|r：报告已复制到聊天输入框，可直接发送。")
+
+    -- 同时写入聊天输入框，方便复制或发送
+    if DEFAULT_CHAT_FRAME then
+        ChatFrame_OpenChat(table.concat(lines, "\n"), DEFAULT_CHAT_FRAME)
+    end
 end
 ----------------------------------------------------------------
 -- 修复：Shift+点击物品时，把物品链接插入「手动添加」输入框
