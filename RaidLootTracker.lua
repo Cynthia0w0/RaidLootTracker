@@ -209,6 +209,12 @@ end
 function Data:AddPendingLoot(link)
     local name = ItemLinkToName(link)
     if not name then return end
+    table.insert(DB.pendingLoot, { link = link, name = name, status = nil, winner = nil })
+end
+
+function Data:AddPendingLootIfMissing(link)
+    local name = ItemLinkToName(link)
+    if not name then return end
     for _, p in ipairs(DB.pendingLoot) do
         if p.link == link then
             return
@@ -356,7 +362,6 @@ function Loot:OnEncounterEnd(encounterID, encounterName, difficultyID, groupSize
         return
     end
     DB.currentBoss = GetBossName(encounterID, encounterName)
-    self:CaptureLootWindow()
     self:CaptureHistory()
     if addon.UI and addon.UI.OpenLoot then
         addon.UI:OpenLoot()
@@ -365,7 +370,7 @@ end
 
 function Loot:OnChatLoot(msg)
     for link in msg:gmatch("|c%x+|Hitem:%d+.-|h%[[^%]]+%]|h|r") do
-        Data:AddPendingLoot(link)
+        Data:AddPendingLootIfMissing(link)
     end
 end
 
@@ -710,8 +715,12 @@ function UI:CreateMainFrame()
         UI:ToggleHistory()
     end)
 
-    makeButton("导出报告", 4, 38, function()
+    makeButton("打印报告", 4, 38, function()
         UI:ExportReport()
+    end)
+
+    makeButton("导出CSV", 5, 38, function()
+        UI:ExportCSV()
     end)
 
     makeButton("重置本周", 1, 12, function()
@@ -1177,6 +1186,26 @@ function UI:ExportReport()
         ChatFrame_OpenChat(table.concat(lines, "\n"), DEFAULT_CHAT_FRAME)
     end
 end
+
+function UI:ExportCSV()
+    local records = addon.Data:GetAllRecords()
+    local lines = { "团员名称,装备名称,需求/贪婪/幻化" }
+    for _, rec in ipairs(records) do
+        local typeName = "幻化"
+        if rec.type == "need" then
+            typeName = "需求"
+        elseif rec.type == "greed" then
+            typeName = "贪婪"
+        end
+        table.insert(lines, table.concat({ rec.winner, rec.itemName, typeName }, ","))
+    end
+
+    local csv = table.concat(lines, "\n")
+    if DEFAULT_CHAT_FRAME then
+        ChatFrame_OpenChat(csv, DEFAULT_CHAT_FRAME)
+    end
+    print("|cff00ff00团队装备需求记录|r：CSV 已复制到聊天输入框，请粘贴到文本文件并另存为 .csv。")
+end
 ----------------------------------------------------------------
 -- 修复：Shift+点击物品时，把物品链接插入「手动添加」输入框
 ----------------------------------------------------------------
@@ -1216,7 +1245,7 @@ addon:SetScript("OnEvent", function(self, event, ...)
             addon.Loot:OnEncounterEnd(...)
         end
     elseif event == "LOOT_OPENED" then
-        if DB and IsInRaid() then
+        if DB and IsInRaid() and #DB.pendingLoot == 0 then
             addon.Loot:CaptureLootWindow()
         end
     elseif event == "CHAT_MSG_LOOT" then
