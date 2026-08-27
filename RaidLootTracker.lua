@@ -2,7 +2,7 @@
 -- 功能：
 --   1. 小图标开关记录表格，展示上次记录的团队成员
 --   2. 一键读取当前队伍/团队成员名称
---   3. Boss 结束后记录掉落分配：需求(骰子) / 贪婪(金币) / 撤销(删除记录)
+--   3. Boss 结束后记录掉落分配：需求(骰子) / 贪婪(金币) / 幻化(紫色头盔) / 撤销(删除记录)
 --   4. 历史记录：查看已记录的装备分配明细
 --   5. 彩蛋：右键成员可登记/取消「最狗团员」，并标记狗头
 
@@ -181,7 +181,7 @@ function Data:ToggleDogMember(name)
 end
 
 function Data:GetMemberSummary(name)
-    local need, greed = {}, {}
+    local need, greed, transmog = {}, {}, {}
     for _, b in ipairs(DB.bosses) do
         for _, it in ipairs(b.items) do
             if it.winner == name then
@@ -189,11 +189,13 @@ function Data:GetMemberSummary(name)
                     table.insert(need, it.name)
                 elseif it.type == "greed" then
                     table.insert(greed, it.name)
+                elseif it.type == "transmog" then
+                    table.insert(transmog, it.name)
                 end
             end
         end
     end
-    return need, greed
+    return need, greed, transmog
 end
 
 function Data:GetTotalItemCount()
@@ -501,7 +503,7 @@ local function CreateMainMemberRow(content)
 
     row:SetScript("OnEnter", function(self)
         if not self.member then return end
-        local need, greed = addon.Data:GetMemberSummary(self.member.name)
+        local need, greed, transmog = addon.Data:GetMemberSummary(self.member.name)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText(self.member.name)
         if #need > 0 then
@@ -510,7 +512,10 @@ local function CreateMainMemberRow(content)
         if #greed > 0 then
             GameTooltip:AddLine("|cffffcc33贪婪：" .. table.concat(greed, "、") .. "|r")
         end
-        if #need == 0 and #greed == 0 then
+        if #transmog > 0 then
+            GameTooltip:AddLine("|cffa335ee幻化：" .. table.concat(transmog, "、") .. "|r")
+        end
+        if #need == 0 and #greed == 0 and #transmog == 0 then
             GameTooltip:AddLine("|cff999999本周暂无记录|r")
         end
         GameTooltip:AddLine("|cffffcc00右键点击可登记/取消最狗团员|r")
@@ -560,7 +565,7 @@ local function CreateLootMemberRow(content)
     return row
 end
 
-local function CreateChoiceButton(parent, upTex, downTex, labelText, r, g, b)
+local function CreateChoiceButton(parent, upTex, downTex, labelText, r, g, b, iconColor)
     local btn = CreateFrame("Button", nil, parent)
     btn:SetSize(38, 38)
     btn:RegisterForClicks("LeftButtonUp")
@@ -569,6 +574,11 @@ local function CreateChoiceButton(parent, upTex, downTex, labelText, r, g, b)
     btn:SetPushedTexture(downTex)
     btn:SetHighlightTexture(upTex)
     btn:GetHighlightTexture():SetBlendMode("ADD")
+    if iconColor then
+        btn:GetNormalTexture():SetVertexColor(iconColor[1], iconColor[2], iconColor[3])
+        btn:GetPushedTexture():SetVertexColor(iconColor[1], iconColor[2], iconColor[3])
+        btn:GetHighlightTexture():SetVertexColor(iconColor[1], iconColor[2], iconColor[3])
+    end
 
     local label = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     label:SetText(labelText)
@@ -819,7 +829,7 @@ function UI:CreateLootFrame()
 
     local legend = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     legend:SetPoint("TOPRIGHT", memberList.scroll, "BOTTOMRIGHT", 0, 2)
-    legend:SetText("需求=骰子  贪婪=金币  撤销=删除记录")
+    legend:SetText("需求=骰子  贪婪=金币  幻化=头盔  撤销=删除记录")
 
     local status = f:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     status:SetPoint("TOPLEFT", itemList.scroll, "BOTTOMLEFT", 0, 2)
@@ -830,25 +840,34 @@ function UI:CreateLootFrame()
         "Interface\\Buttons\\UI-GroupLoot-Dice-Up",
         "Interface\\Buttons\\UI-GroupLoot-Dice-Down",
         "需求", 0.2, 0.8, 1)
-    needBtn:SetPoint("BOTTOM", f, "BOTTOM", -90, 28)
+    needBtn:SetPoint("BOTTOM", f, "BOTTOM", -135, 28)
 
     local greedBtn = CreateChoiceButton(f,
         "Interface\\Buttons\\UI-GroupLoot-Coin-Up",
         "Interface\\Buttons\\UI-GroupLoot-Coin-Down",
         "贪婪", 1, 0.8, 0.2)
-    greedBtn:SetPoint("BOTTOM", f, "BOTTOM", 0, 28)
+    greedBtn:SetPoint("BOTTOM", f, "BOTTOM", -45, 28)
+
+    local transmogBtn = CreateChoiceButton(f,
+        "Interface\\Icons\\INV_Helmet_01",
+        "Interface\\Icons\\INV_Helmet_01",
+        "幻化", 0.64, 0.21, 0.93, {0.64, 0.21, 0.93})
+    transmogBtn:SetPoint("BOTTOM", f, "BOTTOM", 45, 28)
 
     local undoBtn = CreateChoiceButton(f,
         "Interface\\Buttons\\UI-GroupLoot-Pass-Up",
         "Interface\\Buttons\\UI-GroupLoot-Pass-Down",
         "撤销", 0.9, 0.2, 0.2)
-    undoBtn:SetPoint("BOTTOM", f, "BOTTOM", 90, 28)
+    undoBtn:SetPoint("BOTTOM", f, "BOTTOM", 135, 28)
 
     needBtn:SetScript("OnClick", function()
         UI:AssignLoot(UI.currentItem, UI.currentMember and UI.currentMember.name, "need")
     end)
     greedBtn:SetScript("OnClick", function()
         UI:AssignLoot(UI.currentItem, UI.currentMember and UI.currentMember.name, "greed")
+    end)
+    transmogBtn:SetScript("OnClick", function()
+        UI:AssignLoot(UI.currentItem, UI.currentMember and UI.currentMember.name, "transmog")
     end)
     undoBtn:SetScript("OnClick", function()
         UI:UndoLoot(UI.currentItem)
@@ -866,13 +885,19 @@ function UI:CreateLootFrame()
         GameTooltip:AddLine("将该装备记为「贪婪」获得")
         GameTooltip:Show()
     end)
+    transmogBtn:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_TOP")
+        GameTooltip:SetText("幻化（紫色头盔）")
+        GameTooltip:AddLine("将该装备记为「幻化」获得")
+        GameTooltip:Show()
+    end)
     undoBtn:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_TOP")
         GameTooltip:SetText("撤销（删除记录）")
         GameTooltip:AddLine("删除该装备已记录的内容")
         GameTooltip:Show()
     end)
-    for _, b in ipairs({ needBtn, greedBtn, undoBtn }) do
+    for _, b in ipairs({ needBtn, greedBtn, transmogBtn, undoBtn }) do
         b:SetScript("OnLeave", function()
             GameTooltip:Hide()
         end)
@@ -925,12 +950,14 @@ function UI:RefreshMain()
         row.nameText:SetText(m.name)
         row.nameText:SetTextColor(r, g, b)
         row.dogIcon:SetShown(dogName == m.name)
-        local need, greed = addon.Data:GetMemberSummary(m.name)
-        row.summary:SetText(("需求%d 贪婪%d"):format(#need, #greed))
+        local need, greed, transmog = addon.Data:GetMemberSummary(m.name)
+        row.summary:SetText(("需求%d 贪婪%d 幻化%d"):format(#need, #greed, #transmog))
         if #need > 0 then
             row.summary:SetTextColor(0.2, 0.8, 1)
         elseif #greed > 0 then
             row.summary:SetTextColor(1, 0.8, 0.2)
+        elseif #transmog > 0 then
+            row.summary:SetTextColor(0.64, 0.21, 0.93)
         else
             row.summary:SetTextColor(0.6, 0.6, 0.6)
         end
@@ -954,7 +981,7 @@ end
 
 function UI:UpdateStatus()
     if not self.lootFrame then return end
-    local txt = "请先选择装备和成员，然后点击需求/贪婪/撤销"
+    local txt = "请先选择装备和成员，然后点击需求/贪婪/幻化/撤销"
     if self.currentItem then
         txt = "已选装备：" .. self.currentItem.name
         if self.currentMember then
@@ -976,6 +1003,8 @@ function UI:RefreshLoot()
             suffix = "  |cff33ccff[需求 " .. (item.winner or "") .. "]|r"
         elseif item.status == "greed" then
             suffix = "  |cffffcc33[贪婪 " .. (item.winner or "") .. "]|r"
+        elseif item.status == "transmog" then
+            suffix = "  |cffa335ee[幻化 " .. (item.winner or "") .. "]|r"
         end
         row.nameText:SetText(item.name .. suffix)
         SetSelected(row, self.currentItem == item)
@@ -1095,7 +1124,14 @@ function UI:RefreshHistory()
     local records = addon.Data:GetAllRecords()
     self.historyFrame.recordList:SetData(records, CreateHistoryRow, function(row, rec)
         row.record = rec
-        local typeTag = rec.type == "need" and "|cff33ccff[需求]|r" or "|cffffcc33[贪婪]|r"
+        local typeTag
+        if rec.type == "need" then
+            typeTag = "|cff33ccff[需求]|r"
+        elseif rec.type == "greed" then
+            typeTag = "|cffffcc33[贪婪]|r"
+        else
+            typeTag = "|cffa335ee[幻化]|r"
+        end
         row.text:SetText(("%s %s · %s → %s"):format(typeTag, rec.bossName, rec.itemName, rec.winner))
     end)
 end
@@ -1115,14 +1151,17 @@ end
 function UI:ExportReport()
     local lines = { "=== 团队装备需求记录 ===" }
     for _, m in ipairs(DB.members) do
-        local need, greed = addon.Data:GetMemberSummary(m.name)
-        if #need > 0 or #greed > 0 then
+        local need, greed, transmog = addon.Data:GetMemberSummary(m.name)
+        if #need > 0 or #greed > 0 or #transmog > 0 then
             local parts = {}
             if #need > 0 then
                 table.insert(parts, "需求：" .. table.concat(need, "、"))
             end
             if #greed > 0 then
                 table.insert(parts, "贪婪：" .. table.concat(greed, "、"))
+            end
+            if #transmog > 0 then
+                table.insert(parts, "幻化：" .. table.concat(transmog, "、"))
             end
             table.insert(lines, m.name .. " — " .. table.concat(parts, "；"))
         end
