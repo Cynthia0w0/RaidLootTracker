@@ -46,19 +46,16 @@ end
 ----------------------------------------------------------------
 -- 默认数据
 ----------------------------------------------------------------
--- 计算「本周四 07:00 (UTC+8)」对应的稳定周标识；每到周四 07:00 该值会跳变一次
+-- 计算「本周四 07:00」对应的稳定周标识：直接读取服务器当前日期/星期，避免时区换算误差
 local function GetWeeklyResetKey()
-    local utc = GetServerTime()
-    local t = utc + 8 * 3600                    -- 转为 UTC+8 墙钟时间
-    local dayIndex = math.floor(t / 86400)
-    local secondsIntoDay = t % 86400
-    -- 在 UTC+8 坐标系下，1970-01-01 00:00 是周三，故 dayIndex % 7 == 1 时是周四
-    local daysSinceThursday = (dayIndex - 1) % 7
-    local secondsSinceReset = daysSinceThursday * 86400 + secondsIntoDay - 7 * 3600
+    local d = C_DateAndTime.GetCurrentCalendarTime()   -- weekday: 1=周日 ... 5=周四 ... 7=周六
+    local now = C_DateAndTime.GetServerTimeLocal() or GetServerTime()
+    local daysSinceThursday = (d.weekday - 5) % 7
+    local secondsSinceReset = daysSinceThursday * 86400 + (now % 86400) - 7 * 3600
     if secondsSinceReset < 0 then
         secondsSinceReset = secondsSinceReset + 7 * 86400
     end
-    return utc - secondsSinceReset
+    return now - secondsSinceReset
 end
 
 local defaults = {
