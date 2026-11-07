@@ -327,6 +327,17 @@ function Loot:CaptureLootWindow()
     end
 end
 
+function Loot:GetHistoryCount()
+    if not C_LootHistory or not C_LootHistory.GetNumItems then
+        return 0
+    end
+    local ok, n = pcall(C_LootHistory.GetNumItems)
+    if ok then
+        return n
+    end
+    return 0
+end
+
 function Loot:CaptureHistory()
     if not C_LootHistory or not C_LootHistory.GetNumItems then
         return
@@ -335,7 +346,11 @@ function Loot:CaptureHistory()
     if not ok then
         return
     end
-    for i = 1, n do
+    local start = self.encounterHistoryStart or 0
+    if start < 0 or start > n then
+        start = 0
+    end
+    for i = start + 1, n do
         local ok2, item = pcall(C_LootHistory.GetItem, i)
         if ok2 and item then
             local link = item.itemLink or item.link
@@ -344,11 +359,13 @@ function Loot:CaptureHistory()
             end
         end
     end
+    self.encounterHistoryStart = n
 end
 
 function Loot:OnEncounterStart()
     Data:ClearPendingLoot()
     DB.currentBoss = ""
+    self.encounterHistoryStart = self:GetHistoryCount()
 end
 
 function Loot:OnEncounterEnd(encounterID, encounterName, difficultyID, groupSize, success)
@@ -1228,6 +1245,7 @@ addon:SetScript("OnEvent", function(self, event, ...)
         UI:CreateIconButton()
         UI:CreateMainFrame()
         UI:CreateLootFrame()
+        addon.Loot.encounterHistoryStart = addon.Loot:GetHistoryCount()
         print("|cff00ff00团队装备需求记录|r：已加载。输入 /rlt 打开记录，/rlt loot 打开掉落分配。")
     elseif event == "GROUP_ROSTER_UPDATE" then
         if DB and UI.lootFrame and UI.lootFrame:IsShown() then
