@@ -280,6 +280,25 @@ function Group:ReadIntoDB()
     return #DB.members
 end
 
+function Group:GetMemberUnion()
+    -- 已登记成员与当前队伍成员的并集：人员变动后，离队成员仍保留，新成员也会加入
+    local list = {}
+    local seen = {}
+    for _, m in ipairs(DB.members) do
+        if m.name and not seen[m.name] then
+            seen[m.name] = true
+            table.insert(list, { name = m.name, class = m.class })
+        end
+    end
+    for _, m in ipairs(self:GetCurrentMembers()) do
+        if m.name and not seen[m.name] then
+            seen[m.name] = true
+            table.insert(list, { name = m.name, class = m.class })
+        end
+    end
+    return list
+end
+
 ----------------------------------------------------------------
 -- 掉落模块
 ----------------------------------------------------------------
@@ -1033,7 +1052,7 @@ function UI:RefreshLoot()
         SetSelected(row, self.currentItem == item)
     end)
 
-    local members = addon.Group:GetCurrentMembers()
+    local members = addon.Group:GetMemberUnion()
     f.memberList:SetData(members, CreateLootMemberRow, function(row, m)
         row.member = m
         local r, g, b = ClassColor(m.class)
